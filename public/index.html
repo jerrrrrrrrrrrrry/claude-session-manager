@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Session Manager</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0d0d12;
+  --bg-secondary: #16161e;
+  --bg-tertiary: #1e1e28;
+  --bg-card: #22222e;
+  --bg-hover: #2a2a38;
+  --border: #2e2e3a;
+  --text-primary: #e8e8ed;
+  --text-secondary: #9999a5;
+  --text-muted: #666670;
+  --accent-blue: #4f8cff;
+  --accent-green: #34d399;
+  --accent-yellow: #fbbf24;
+  --accent-red: #f87171;
+  --accent-purple: #a78bfa;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header h1 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-btn.active {
+  background: var(--accent-blue);
+  color: white;
+}
+
+/* Search */
+.search-container {
+  position: relative;
+  width: 280px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+/* Main Layout */
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 260px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.project-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.project-item:hover {
+  background: var(--bg-hover);
+}
+
+.project-item.selected {
+  background: var(--bg-card);
+  border-left-color: var(--accent-blue);
+}
+
+.project-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Content Area */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.content-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+/* Dashboard */
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-value.blue { color: var(--accent-blue); }
+.stat-value.green { color: var(--accent-green); }
+.stat-value.yellow { color: var(--accent-yellow); }
+.stat-value.purple { color: var(--accent-purple); }
+
+/* Session List */
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-card {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.session-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-blue);
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.session-preview {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.session-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.session-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.tokens {
+  color: var(--accent-green);
+}
+
+/* Session Detail */
+.session-detail {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.detail-header {
+  margin-bottom: 24px;
+}
+
+.detail-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.detail-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border-left: 3px solid var(--border);
+}
+
+.message.user {
+  border-left-color: var(--accent-blue);
+}
+
+.message.assistant {
+  border-left-color: var(--accent-purple);
+}
+
+.message.progress {
+  border-left-color: var(--accent-yellow);
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.message-role {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.message.user .message-role { color: var(--accent-blue); }
+.message.assistant .message-role { color: var(--accent-purple); }
+.message.progress .message-role { color: var(--accent-yellow); }
+
+.message-time {
+  color: var(--text-muted);
+}
+
+.message-content {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.message-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.message-toggle label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-use {
+  background: var(--bg-hover);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.tool-use-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent-green);
+}
+
+.tool-use-header .tool-name {
+  background: var(--accent-green);
+  color: var(--bg-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.tool-use-content {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.tool-use.collapsed .tool-use-content {
+  display: none;
+}
+
+.tool-use-toggle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* Search Results */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.search-result {
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.search-result:hover {
+  background: var(--bg-hover);
+}
+
+.result-type {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.result-type.user { color: var(--accent-blue); background: rgba(79, 140, 255, 0.1); }
+.result-type.assistant { color: var(--accent-purple); background: rgba(167, 139, 250, 0.1); }
+.result-type.command { color: var(--accent-green); background: rgba(52, 211, 153, 0.1); }
+
+.result-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.result-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* Stats Page */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.chart-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bar-label {
+  width: 80px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.bar-track {
+  flex: 1;
+  height: 24px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: 4px;
+}
+
+.bar-value {
+  width: 60px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+/* Back Button */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+
+.back-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+</style>
+</head>
+<body>
+<div class="app-container">
+  <div class="header">
+    <h1>Claude Session Manager</h1>
+    <div class="header-nav">
+      <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+      <button class="nav-btn" data-view="sessions">Sessions</button>
+      <button class="nav-btn" data-view="stats">Stats</button>
+    </div>
+    <div class="search-container">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search sessions...">
+    </div>
+  </div>
+
+  <div class="main-layout">
+    <div class="sidebar">
+      <div class="sidebar-header">Projects</div>
+      <div class="sidebar-content" id="projectsList"></div>
+    </div>
+
+    <div class="content">
+      <div class="content-body" id="contentBody">
+        <div class="loading">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '';
+let currentView = 'dashboard';
+let selectedProject = null;
+let selectedSession = null;
+let projects = [];
+let sessions = [];
+let searchResults = [];
+let stats = null;
+let showAllMessages = false;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  initNavigation();
+  loadProjects();
+  loadStats();
+  loadSessions();
+  initSearch();
+});
+
+function initNavigation() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentView = btn.dataset.view;
+      selectedSession = null;
+      render();
+    });
+  });
+}
+
+async function loadProjects() {
+  try {
+    const res = await fetch(`${API_BASE}/api/projects`);
+    const data = await res.json();
+    projects = data.data || [];
+    renderProjects();
+  } catch (err) {
+    projects = [];
+    renderProjects();
+  }
+}
+
+async function loadSessions() {
+  try {
+    const res = await fetch(`${API_BASE}/api/sessions?limit=100`);
+    const data = await res.json();
+    sessions = data.data || [];
+  } catch (err) {
+    sessions = [];
+  }
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch(`${API_BASE}/api/stats`);
+    const data = await res.json();
+    stats = data.data;
+  } catch (err) {
+    stats = null;
+  }
+}
+
+async function search(query) {
+  if (!query || query.length < 2) {
+    searchResults = [];
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=20`);
+    const data = await res.json();
+    searchResults = data.data?.results || [];
+  } catch (err) {
+    searchResults = [];
+  }
+}
+
+function initSearch() {
+  const input = document.getElementById('searchInput');
+  let debounceTimer;
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(async () => {
+      const query = input.value.trim();
+      if (query.length >= 2) {
+        await search(query);
+        showSearchResults();
+      } else {
+        searchResults = [];
+        render();
+      }
+    }, 300);
+  });
+}
+
+function selectProject(projectId) {
+  selectedProject = projectId;
+  renderProjects();
+  render();
+}
+
+function selectSession(sessionId) {
+  selectedSession = sessionId;
+  currentView = 'detail';
+  render();
+}
+
+function showSearchResults() {
+  currentView = 'search';
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  render();
+}
+
+function render() {
+  switch (currentView) {
+    case 'dashboard': renderDashboard(); break;
+    case 'sessions': renderSessions(); break;
+    case 'search': renderSearchResults(); break;
+    case 'stats': renderStats(); break;
+    case 'detail': renderSessionDetail(); break;
+  }
+}
+
+function renderProjects() {
+  const container = document.getElementById('projectsList');
+  const totalSessions = sessions.length;
+  const allProjects = [
+    { name: 'All Projects', path: 'all', sessionCount: totalSessions },
+    ...projects
+  ];
+
+  container.innerHTML = allProjects.map(p => `
+    <div class="project-item ${selectedProject === p.path || (selectedProject === null && p.path === 'all') ? 'selected' : ''}"
+         onclick="selectProject('${p.path === 'all' ? '' : p.path}')">
+      <div class="project-name">${escapeHtml(p.name.replace(/-/g, '/'))}</div>
+      <div class="project-meta">${p.sessionCount || 0} sessions</div>
+    </div>
+  `).join('');
+}
+
+function renderDashboard() {
+  const container = document.getElementById('contentBody');
+  if (!stats) {
+    container.innerHTML = '<div class="loading">Loading stats...</div>';
+    return;
+  }
+
+  const { global, byProject } = stats;
+  const topProjects = byProject.slice(0, 5);
+
+  container.innerHTML = `
+    <div class="dashboard">
+      <div class="stat-card">
+        <div class="stat-label">Total Sessions</div>
+        <div class="stat-value blue">${formatNumber(global.totalSessions)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Projects</div>
+        <div class="stat-value green">${global.totalProjects}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Tokens</div>
+        <div class="stat-value yellow">${formatNumber(global.totalTokens)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Input Tokens</div>
+        <div class="stat-value purple">${formatNumber(global.totalInputTokens)}</div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="chart-card">
+        <div class="chart-title">Top Projects by Sessions</div>
+        <div class="bar-chart">
+          ${topProjects.map(p => `
+            <div class="bar-row">
+              <div class="bar-label">${escapeHtml(truncate(p.project.replace(/-/g, '/'), 12))}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${(p.sessions / Math.max(...topProjects.map(x => x.sessions))) * 100}%"></div>
+              </div>
+              <div class="bar-value">${p.sessions}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Top Projects by Tokens</div>
+        <div class="bar-chart">
+          ${[...topProjects].sort((a, b) => b.tokens - a.tokens).map(p => `
+            <div class="bar-row">
+              <div class="bar-label">${escapeHtml(truncate(p.project.replace(/-/g, '/'), 12))}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${(p.tokens / Math.max(...topProjects.map(x => x.tokens))) * 100}%"></div>
+              </div>
+              <div class="bar-value">${formatNumber(p.tokens)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSessions() {
+  const container = document.getElementById('contentBody');
+  let filteredSessions = sessions;
+  if (selectedProject) {
+    filteredSessions = sessions.filter(s => s.projectId === selectedProject);
+  }
+
+  if (filteredSessions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#128196;</div>
+        <div class="empty-title">No sessions found</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="session-list">
+      ${filteredSessions.map(s => `
+        <div class="session-card" onclick="selectSession('${s.sessionId}')">
+          <div class="session-header">
+            <div class="session-preview">${escapeHtml(s.preview)}</div>
+            <div class="session-time">${formatTime(s.timestamp)}</div>
+          </div>
+          <div class="session-meta">
+            <span>${escapeHtml(s.projectPath)}</span>
+            <span>${s.messageCount} messages</span>
+            <span class="tokens">${formatNumber(s.totalTokens)} tokens</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function renderSessionDetail() {
+  const container = document.getElementById('contentBody');
+  if (!selectedSession) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-title">Select a session</div></div>';
+    return;
+  }
+
+  container.innerHTML = '<div class="loading">Loading session...</div>';
+
+  // First try: get projectId from sessions array and request directly
+  const sessionInfo = sessions.find(s => s.sessionId === selectedSession);
+  if (sessionInfo && sessionInfo.projectId) {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionInfo.projectId}/${selectedSession}`);
+      if (res.ok) {
+        const data = await res.json();
+        displaySessionDetail(data.data);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Fallback: try all projects
+  for (const proj of projects) {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${proj.name}/${selectedSession}`);
+      if (res.ok) {
+        const data = await res.json();
+        displaySessionDetail(data.data);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  container.innerHTML = '<div class="empty-state"><div class="empty-title">Session not found</div></div>';
+}
+
+function displaySessionDetail(session) {
+  const container = document.getElementById('contentBody');
+
+  // Filter messages: show all if showAllMessages is true, otherwise filter noise
+  const filteredMessages = showAllMessages
+    ? session.messages
+    : session.messages.filter(msg => {
+        // User messages: only show non-meta (content as array with type:text)
+        if (msg.type === 'user') {
+          if (!msg.message?.content) return false;
+          const content = msg.message.content;
+          if (Array.isArray(content)) {
+            return content.some(c => c.type === 'text');
+          }
+          return typeof content === 'string' && content.length > 0;
+        }
+        // Assistant messages: must have text content (not just thinking)
+        if (msg.type === 'assistant') {
+          if (!msg.message?.content) return false;
+          const content = msg.message.content;
+          if (Array.isArray(content)) {
+            return content.some(c => c.type === 'text');
+          }
+          return false;
+        }
+        // Progress messages: only show actual user-visible messages
+        if (msg.type === 'progress') {
+          return msg.data?.type === 'message' && msg.data?.message?.text;
+        }
+        return false;
+      });
+
+  container.innerHTML = `
+    <div class="session-detail">
+      <button class="back-btn" onclick="currentView = 'sessions'; selectedSession = null; render();">
+        &#8592; Back
+      </button>
+      <div class="detail-header">
+        <div class="detail-title">Session ${session.sessionId.substring(0, 8)}...</div>
+        <div class="detail-meta">
+          <span>Project: ${escapeHtml(session.project)}</span>
+          <span>Messages: ${filteredMessages.length} / ${session.messageCount}</span>
+        </div>
+      </div>
+      <div class="message-toggle">
+        <label>
+          <input type="checkbox" onchange="showAllMessages = this.checked; renderSessionDetail();" ${showAllMessages ? 'checked' : ''}>
+          显示全部原始消息（调试用）
+        </label>
+      </div>
+      <div class="message-list">
+        ${filteredMessages.map(msg => renderMessage(msg)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderMessage(msg) {
+  const role = msg.type || 'progress';
+  const timestamp = msg.timestamp || '';
+  let content = '';
+
+  // Handle user messages - support both string and array content
+  if (msg.type === 'user' && msg.message?.content) {
+    const contentData = msg.message.content;
+    if (typeof contentData === 'string') {
+      content = contentData;
+    } else if (Array.isArray(contentData)) {
+      const textBlock = contentData.find(c => c.type === 'text');
+      content = textBlock?.text || '';
+    }
+  // Handle assistant messages - show text, not thinking
+  } else if (msg.type === 'assistant' && msg.message?.content) {
+    const contentData = msg.message.content;
+    if (Array.isArray(contentData)) {
+      // Get text content (not thinking)
+      const textBlock = contentData.find(c => c.type === 'text');
+      content = textBlock?.text || '';
+      // Get tool_use blocks for display
+      const toolBlocks = contentData.filter(c => c.type === 'tool_use');
+      if (toolBlocks.length > 0) {
+        const toolUseHtml = toolBlocks.map(tool => {
+          const toolName = tool.name || 'unknown';
+          const inputSummary = tool.input ? JSON.stringify(tool.input).substring(0, 100) : '';
+          const outputSummary = tool.output ? (typeof tool.output === 'string' ? tool.output.substring(0, 200) : JSON.stringify(tool.output).substring(0, 200)) : '';
+          return `
+            <div class="tool-use" onclick="this.classList.toggle('collapsed')">
+              <div class="tool-use-header">
+                <span class="tool-name">${escapeHtml(toolName)}</span>
+                <span class="tool-use-toggle">点击展开/折叠</span>
+              </div>
+              <div class="tool-use-content">
+                <div><strong>输入:</strong> ${escapeHtml(inputSummary)}</div>
+                ${outputSummary ? `<div><strong>输出:</strong> ${escapeHtml(outputSummary)}</div>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+        content = content + (content ? '\n\n' : '') + toolUseHtml;
+      }
+    }
+    if (msg.message.usage) {
+      content += `\n\n[Tokens: in=${msg.message.usage.input_tokens}, out=${msg.message.usage.output_tokens}]`;
+    }
+  // Handle progress messages - only show actual user messages
+  } else if (msg.type === 'progress') {
+    if (msg.data?.type === 'message' && msg.data?.message?.text) {
+      content = msg.data.message.text;
+    } else if (showAllMessages && msg.data?.type === 'hook_progress') {
+      content = `[${msg.data.hookEvent}] ${msg.data.hookName}: ${msg.data.command || ''}`;
+    } else if (showAllMessages && msg.data?.type === 'content') {
+      content = Array.isArray(msg.data.content) ? msg.data.content.map(c => c.text || c).join('') : msg.data.content;
+    } else if (showAllMessages) {
+      content = JSON.stringify(msg.data || msg, null, 2).substring(0, 500);
+    }
+  }
+
+  return `
+    <div class="message ${role}">
+      <div class="message-header">
+        <span class="message-role">${role}</span>
+        <span class="message-time">${formatTime(timestamp)}</span>
+      </div>
+      <div class="message-content">${escapeHtml(content)}</div>
+    </div>
+  `;
+}
+
+function renderSearchResults() {
+  const container = document.getElementById('contentBody');
+  const query = document.getElementById('searchInput').value;
+
+  if (searchResults.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#128269;</div>
+        <div class="empty-title">${query ? 'No results found' : 'Search sessions'}</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="search-results">
+      ${searchResults.map(r => `
+        <div class="search-result" onclick="selectSession('${r.sessionId}')">
+          <div class="result-header">
+            <span class="result-type ${r.matchType}">${r.matchType || 'result'}</span>
+            <span class="result-meta">${formatTime(r.timestamp)} - ${escapeHtml(r.project?.replace(/-/g, '/'))}</span>
+          </div>
+          <div class="result-preview">${escapeHtml(r.matchedContent)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderStats() {
+  const container = document.getElementById('contentBody');
+  if (!stats) {
+    container.innerHTML = '<div class="loading">Loading stats...</div>';
+    return;
+  }
+
+  const { global, byProject, byDay } = stats;
+
+  container.innerHTML = `
+    <div class="dashboard">
+      <div class="stat-card">
+        <div class="stat-label">Total Sessions</div>
+        <div class="stat-value blue">${formatNumber(global.totalSessions)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Projects</div>
+        <div class="stat-value green">${global.totalProjects}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Input Tokens</div>
+        <div class="stat-value purple">${formatNumber(global.totalInputTokens)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Output Tokens</div>
+        <div class="stat-value yellow">${formatNumber(global.totalOutputTokens)}</div>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="chart-card">
+        <div class="chart-title">Sessions by Project</div>
+        <div class="bar-chart">
+          ${byProject.map(p => `
+            <div class="bar-row">
+              <div class="bar-label">${escapeHtml(truncate(p.projectPath.replace('/', ''), 12))}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${(p.sessions / Math.max(...byProject.map(x => x.sessions), 1)) * 100}%"></div>
+              </div>
+              <div class="bar-value">${p.sessions}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Tokens by Project</div>
+        <div class="bar-chart">
+          ${[...byProject].sort((a, b) => b.tokens - a.tokens).map(p => `
+            <div class="bar-row">
+              <div class="bar-label">${escapeHtml(truncate(p.projectPath.replace('/', ''), 12))}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${(p.tokens / Math.max(...byProject.map(x => x.tokens), 1)) * 100}%"></div>
+              </div>
+              <div class="bar-value">${formatNumber(p.tokens)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="chart-card" style="grid-column: span 2;">
+        <div class="chart-title">Activity by Day</div>
+        <div class="bar-chart">
+          ${byDay.slice(0, 7).reverse().map(d => `
+            <div class="bar-row">
+              <div class="bar-label">${d.date}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: ${(d.sessions / Math.max(...byDay.map(x => x.sessions), 1)) * 100}%"></div>
+              </div>
+              <div class="bar-value">${d.sessions} sessions</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Utilities
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function truncate(text, maxLen) {
+  if (!text) return '';
+  return text.length > maxLen ? text.substring(0, maxLen) + '...' : text;
+}
+
+function formatTime(timestamp) {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now - date;
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatNumber(num) {
+  if (!num) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}
+</script>
+</body>
+</html>

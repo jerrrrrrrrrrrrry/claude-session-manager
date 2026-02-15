@@ -1,0 +1,13 @@
+{
+  "name": "claude-session-manager",
+  "version": "1.0.0",
+  "description": "Browse and manage Claude Code history sessions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "chokidar": "^3.5.3"
+  }
+}
