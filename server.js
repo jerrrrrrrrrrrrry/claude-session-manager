@@ -10,7 +10,13 @@ const dataReader = require("./src/data-reader.js");
 const app = express();
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (
+    origin &&
+    (origin.includes("localhost") || origin.includes("127.0.0.1"))
+  ) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept",
@@ -26,13 +32,18 @@ app.get("/api/projects", (req, res) => {
   res.json({ success: true, data: projects });
 });
 
-// Get all sessions (optionally filtered by project)
+// Get all sessions (optionally filtered by project, with pagination)
 app.get("/api/sessions", (req, res) => {
   const project = req.query.project;
+  const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 50;
 
-  const sessions = dataReader.getSessions(project, limit);
-  res.json({ success: true, data: sessions });
+  const result = dataReader.getSessions(project, page, limit);
+  res.json({
+    success: true,
+    data: result.sessions,
+    meta: result.meta,
+  });
 });
 
 // Get token usage statistics

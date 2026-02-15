@@ -290,7 +290,14 @@ body {
 .detail-title {
   font-size: 20px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.detail-slug {
+  font-size: 14px;
+  color: var(--accent-purple);
+  margin-bottom: 12px;
+  font-family: monospace;
 }
 
 .detail-meta {
@@ -352,6 +359,44 @@ body {
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+/* Markdown rendering styles */
+.message-content pre {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-content code {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.message-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.message-content ul, .message-content ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+
+.message-content li {
+  margin: 4px 0;
+}
+
+.message-content blockquote {
+  border-left: 3px solid var(--accent-purple);
+  margin: 8px 0;
+  padding-left: 12px;
+  color: var(--text-muted);
 }
 
 .message-toggle {
@@ -572,6 +617,44 @@ body {
   color: var(--text-primary);
 }
 
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-blue);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 12px;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
@@ -608,36 +691,122 @@ body {
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 const API_BASE = '';
 let currentView = 'dashboard';
+let previousView = null;
 let selectedProject = null;
 let selectedSession = null;
 let projects = [];
 let sessions = [];
+let sessionMeta = { total: 0, page: 1, limit: 50, totalPages: 1 };
+let currentPage = 1;
 let searchResults = [];
+let currentSearchQuery = '';
 let stats = null;
 let showAllMessages = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
+  initRouting();
   loadProjects();
   loadStats();
-  loadSessions();
+  loadSessions(currentPage);
   initSearch();
 });
 
 function initNavigation() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      const newView = btn.dataset.view;
+      if (newView !== currentView) {
+        previousView = currentView;
+      }
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      currentView = btn.dataset.view;
+      currentView = newView;
       selectedSession = null;
       render();
+      // Update URL
+      const hash = newView === 'dashboard' ? '#/' : `#/${newView}`;
+      history.pushState({ view: newView, page: currentPage, project: selectedProject }, '', hash);
     });
   });
+
+  // Handle browser back/forward buttons
+  window.addEventListener('popstate', (e) => {
+    if (e.state) {
+      handleRoute(e.state);
+    }
+  });
+}
+
+function initRouting() {
+  // Parse initial hash
+  const hash = window.location.hash.slice(1) || '/';
+  const parts = hash.split('/').filter(p => p);
+
+  if (parts.length >= 1) {
+    const view = parts[0];
+    if (['dashboard', 'sessions', 'stats'].includes(view)) {
+      currentView = view;
+      // Update nav button
+      document.querySelectorAll('.nav-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === view);
+      });
+    }
+
+    // Handle project filter
+    if (parts[1] && parts[1] !== 'all') {
+      selectedProject = parts[1];
+    }
+
+    // Handle session detail: #/sessions/project/sessionId
+    if (parts.length >= 3 && parts[0] === 'sessions') {
+      selectedSession = parts[2];
+      currentView = 'detail';
+    }
+  }
+}
+
+function handleRoute(state) {
+  if (!state) return;
+
+  previousView = currentView;
+  currentView = state.view || 'dashboard';
+  currentPage = state.page || 1;
+  selectedProject = state.project || null;
+
+  // Update nav button
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === currentView);
+  });
+
+  // Reload data if needed
+  if (currentView === 'sessions') {
+    loadSessions(currentPage);
+  }
+
+  render();
+}
+
+function goBack() {
+  const targetView = previousView || 'sessions';
+  selectedSession = null;
+
+  // Update nav button
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === targetView);
+  });
+
+  currentView = targetView;
+  render();
+
+  // Update URL
+  const hash = targetView === 'dashboard' ? '#/' : `#/${targetView}`;
+  history.pushState({ view: targetView, page: currentPage, project: selectedProject }, '', hash);
 }
 
 async function loadProjects() {
@@ -652,13 +821,15 @@ async function loadProjects() {
   }
 }
 
-async function loadSessions() {
+async function loadSessions(page = 1) {
   try {
-    const res = await fetch(`${API_BASE}/api/sessions?limit=100`);
+    const res = await fetch(`${API_BASE}/api/sessions?page=${page}&limit=50`);
     const data = await res.json();
     sessions = data.data || [];
+    sessionMeta = data.meta || { total: 0, page: 1, limit: 50, totalPages: 1 };
   } catch (err) {
     sessions = [];
+    sessionMeta = { total: 0, page: 1, limit: 50, totalPages: 1 };
   }
 }
 
@@ -675,8 +846,10 @@ async function loadStats() {
 async function search(query) {
   if (!query || query.length < 2) {
     searchResults = [];
+    currentSearchQuery = '';
     return;
   }
+  currentSearchQuery = query;
   try {
     const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=20`);
     const data = await res.json();
@@ -684,6 +857,15 @@ async function search(query) {
   } catch (err) {
     searchResults = [];
   }
+}
+
+// Highlight matched text with <mark> tags (after escapeHtml)
+function highlightMatches(text, query) {
+  if (!query || !text) return escapeHtml(text);
+  const escaped = escapeHtml(text);
+  // Case-insensitive search with regex
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return escaped.replace(regex, '<mark>$1</mark>');
 }
 
 function initSearch() {
@@ -711,12 +893,17 @@ function selectProject(projectId) {
 }
 
 function selectSession(sessionId) {
+  previousView = currentView;
   selectedSession = sessionId;
   currentView = 'detail';
   render();
+  // Update URL
+  const hash = `#/sessions/${selectedProject || 'all'}/${sessionId}`;
+  history.pushState({ view: 'detail', sessionId, project: selectedProject, page: currentPage }, '', hash);
 }
 
 function showSearchResults() {
+  previousView = currentView;
   currentView = 'search';
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   render();
@@ -846,7 +1033,34 @@ function renderSessions() {
         </div>
       `).join('')}
     </div>
+    ${renderPagination()}
   `;
+}
+
+function renderPagination() {
+  const { page, totalPages, total } = sessionMeta;
+  if (totalPages <= 1) return '';
+
+  return `
+    <div class="pagination">
+      <button class="pagination-btn" onclick="changePage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>
+        上一页
+      </button>
+      <span class="pagination-info">${page} / ${totalPages} (共 ${total} 条)</span>
+      <button class="pagination-btn" onclick="changePage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>
+        下一页
+      </button>
+    </div>
+  `;
+}
+
+async function changePage(page) {
+  currentPage = page;
+  await loadSessions(page);
+  render();
+  // Update URL
+  const hash = selectedProject ? `#/sessions/${selectedProject}` : '#/sessions';
+  history.pushState({ view: 'sessions', page, project: selectedProject }, '', hash);
 }
 
 async function renderSessionDetail() {
@@ -922,16 +1136,34 @@ function displaySessionDetail(session) {
         return false;
       });
 
+  // Extract session metadata for M1 and M2
+  const sessionMeta = extractSessionMetadata(session.messages);
+
+  // Calculate session duration
+  const duration = calculateDuration(session.messages);
+
   container.innerHTML = `
     <div class="session-detail">
-      <button class="back-btn" onclick="currentView = 'sessions'; selectedSession = null; render();">
+      <button class="back-btn" onclick="goBack()">
         &#8592; Back
       </button>
       <div class="detail-header">
-        <div class="detail-title">Session ${session.sessionId.substring(0, 8)}...</div>
+        <div class="detail-title">${escapeHtml(sessionMeta.title || 'Session ' + session.sessionId.substring(0, 8))}</div>
+        ${sessionMeta.slug ? `<div class="detail-slug">${escapeHtml(sessionMeta.slug)}</div>` : ''}
         <div class="detail-meta">
           <span>Project: ${escapeHtml(session.project)}</span>
           <span>Messages: ${filteredMessages.length} / ${session.messageCount}</span>
+          ${duration ? `<span>Duration: ${duration}</span>` : ''}
+        </div>
+        <div class="detail-meta">
+          ${sessionMeta.version ? `<span>Claude Code: ${escapeHtml(sessionMeta.version)}</span>` : ''}
+          ${sessionMeta.model ? `<span>Model: ${escapeHtml(sessionMeta.model)}</span>` : ''}
+          ${sessionMeta.gitBranch ? `<span>Branch: ${escapeHtml(sessionMeta.gitBranch)}</span>` : ''}
+        </div>
+        <div class="detail-meta">
+          ${sessionMeta.cwd ? `<span>CWD: ${escapeHtml(sessionMeta.cwd)}</span>` : ''}
+          ${sessionMeta.teamName ? `<span>Team: ${escapeHtml(sessionMeta.teamName)}</span>` : ''}
+          ${sessionMeta.agentName ? `<span>Agent: ${escapeHtml(sessionMeta.agentName)}</span>` : ''}
         </div>
       </div>
       <div class="message-toggle">
@@ -945,6 +1177,101 @@ function displaySessionDetail(session) {
       </div>
     </div>
   `;
+}
+
+// Extract session metadata for title and meta information (M1 & M2)
+function extractSessionMetadata(messages) {
+  let title = '';
+  let slug = '';
+  let version = '';
+  let model = '';
+  let gitBranch = '';
+  let cwd = '';
+  let teamName = '';
+  let agentName = '';
+
+  // First pass: get basic info from any message
+  for (const msg of messages) {
+    if (!version && msg.version) version = msg.version;
+    if (!gitBranch && msg.gitBranch) gitBranch = msg.gitBranch;
+    if (!cwd && msg.cwd) cwd = msg.cwd;
+    if (!teamName && msg.teamName) teamName = msg.teamName;
+    if (!agentName && msg.agentName) agentName = msg.agentName;
+  }
+
+  // Second pass: find slug from assistant messages
+  for (const msg of messages) {
+    if (msg.slug) {
+      slug = msg.slug;
+      break;
+    }
+  }
+
+  // Third pass: find first real user message for title (M1)
+  for (const msg of messages) {
+    // Skip meta messages
+    if (msg.isMeta === true) continue;
+
+    if (msg.type === 'user' && msg.message?.content) {
+      let text = '';
+      if (typeof msg.message.content === 'string') {
+        text = msg.message.content;
+      } else if (Array.isArray(msg.message.content)) {
+        const textContent = msg.message.content.find(c => c.type === 'text');
+        text = textContent?.text || '';
+      }
+
+      // Skip command messages (system noise)
+      if (text.startsWith('<local-command-') ||
+          text.startsWith('<command-name>') ||
+          text.startsWith('<local-command-caveat>') ||
+          text.startsWith('<local-command-stdout>')) {
+        continue;
+      }
+
+      if (text) {
+        // Truncate to 60 characters for title (M1)
+        title = text.substring(0, 60).replace(/\n/g, ' ');
+        break;
+      }
+    }
+  }
+
+  // Fourth pass: find model from assistant messages (M2)
+  for (const msg of messages) {
+    if (msg.type === 'assistant' && msg.message?.model) {
+      model = msg.message.model;
+      break;
+    }
+  }
+
+  return { title, slug, version, model, gitBranch, cwd, teamName, agentName };
+}
+
+// Calculate session duration from first to last message timestamps
+function calculateDuration(messages) {
+  let firstTs = null;
+  let lastTs = null;
+
+  for (const msg of messages) {
+    if (msg.timestamp) {
+      const ts = new Date(msg.timestamp);
+      if (!firstTs || ts < firstTs) firstTs = ts;
+      if (!lastTs || ts > lastTs) lastTs = ts;
+    }
+  }
+
+  if (firstTs && lastTs) {
+    const diffMs = lastTs - firstTs;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+    if (diffMins > 0) {
+      return `${diffMins}m ${diffSecs}s`;
+    }
+    return `${diffSecs}s`;
+  }
+  return '';
 }
 
 function renderMessage(msg) {
@@ -1013,7 +1340,7 @@ function renderMessage(msg) {
         <span class="message-role">${role}</span>
         <span class="message-time">${formatTime(timestamp)}</span>
       </div>
-      <div class="message-content">${escapeHtml(content)}</div>
+      <div class="message-content">${markdownToHtml(content)}</div>
     </div>
   `;
 }
@@ -1040,7 +1367,7 @@ function renderSearchResults() {
             <span class="result-type ${r.matchType}">${r.matchType || 'result'}</span>
             <span class="result-meta">${formatTime(r.timestamp)} - ${escapeHtml(r.project?.replace(/-/g, '/'))}</span>
           </div>
-          <div class="result-preview">${escapeHtml(r.matchedContent)}</div>
+          <div class="result-preview">${highlightMatches(r.matchedContent, currentSearchQuery)}</div>
         </div>
       `).join('')}
     </div>
@@ -1131,6 +1458,16 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+function markdownToHtml(text) {
+  if (!text) return '';
+  if (typeof marked === 'undefined') return escapeHtml(text);
+  try {
+    return marked.parse(text);
+  } catch (e) {
+    return escapeHtml(text);
+  }
 }
 
 function truncate(text, maxLen) {

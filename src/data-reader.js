@@ -325,7 +325,7 @@ function searchSessions(query, limit = 20) {
         ) {
           results.push({
             sessionId: file.replace(".jsonl", ""),
-            project: project.name,
+            project: getRealProjectPath(project.name) || project.name,
             timestamp: msg.timestamp || msg.snapshot?.timestamp,
             matchedContent: searchableText.substring(0, 200),
             matchType,
@@ -359,7 +359,7 @@ function searchCommands(query, limit = 20) {
       if (cmd.display && cmd.display.toLowerCase().includes(queryLower)) {
         results.push({
           sessionId: cmd.sessionId,
-          project: cmd.project,
+          project: getRealProjectPath(cmd.project) || cmd.project,
           timestamp: new Date(cmd.timestamp).toISOString(),
           matchedContent: cmd.display,
           matchType: "command",
@@ -516,14 +516,7 @@ function getStats() {
 
 // --- Sessions (list all sessions with metadata) ---
 
-function getSessions(projectId = null, limit = 50) {
-  // Check cache first
-  const cacheKey = `${projectId || "all"}:${limit}`;
-  const cached = sessionCache.sessions.get(cacheKey);
-  if (cached && Date.now() - sessionCache.lastUpdate < CACHE_TTL) {
-    return cached;
-  }
-
+function getSessions(projectId = null, page = 1, limit = 50) {
   // Ensure watcher is initialized
   initWatcher();
 
@@ -543,7 +536,8 @@ function getSessions(projectId = null, limit = 50) {
       .readdirSync(projectPath)
       .filter((f) => f.endsWith(".jsonl"));
 
-    for (const file of files.slice(0, limit)) {
+    // Read all files for pagination calculation
+    for (const file of files) {
       const sessionPath = path.join(projectPath, file);
       const messages = safeReadJSONL(sessionPath);
 
@@ -632,11 +626,20 @@ function getSessions(projectId = null, limit = 50) {
     (b.timestamp || "").localeCompare(a.timestamp || ""),
   );
 
-  const result = allSessions.slice(0, limit);
+  // Calculate pagination
+  const total = allSessions.length;
+  const offset = (page - 1) * limit;
+  const paginatedSessions = allSessions.slice(offset, offset + limit);
 
-  // Cache result
-  sessionCache.sessions.set(cacheKey, result);
-  sessionCache.lastUpdate = Date.now();
+  const result = {
+    sessions: paginatedSessions,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
 
   return result;
 }
